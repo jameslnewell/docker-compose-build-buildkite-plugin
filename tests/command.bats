@@ -16,11 +16,8 @@ setup() {
   export MY_VAR_0="first"
   export MY_VAR_1="second"
   export MY_VAR_2="third"
-  mapfile -t result < <(plugin_read_list "MY_VAR")
-  [[ "${#result[@]}" == "3" ]]
-  [[ "${result[0]}" == "first" ]]
-  [[ "${result[1]}" == "second" ]]
-  [[ "${result[2]}" == "third" ]]
+  result=$(plugin_read_list "MY_VAR")
+  [[ "$result" == $'first\nsecond\nthird' ]]
 }
 
 @test "plugin_read_list with empty result" {
