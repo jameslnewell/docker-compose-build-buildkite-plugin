@@ -56,10 +56,11 @@ mapfile -t TAGS < <(plugin_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_TAGS
 #
 # The file lives in its own per-job dir (BUILDKITE_JOB_ID is unique) so the
 # upload below can address it by bare filename — keeping the artifact in the
-# Buildkite UI named `docker-compose.override.yml` rather than its per-job
-# tmp path.
+# Buildkite UI named `docker-compose-build-buildkite-plugin.yml` (this
+# plugin's name) rather than its per-job tmp path, and avoiding the special
+# `docker-compose.override.yml` filename that compose auto-loads.
 OVERRIDE_DIR="${TMPDIR:-/tmp}/docker-compose-build-buildkite-plugin-${BUILDKITE_JOB_ID}"
-OVERRIDE_FILE="${OVERRIDE_DIR}/docker-compose.override.yml"
+OVERRIDE_FILE="${OVERRIDE_DIR}/docker-compose-build-buildkite-plugin.yml"
 mkdir -p "$OVERRIDE_DIR"
 trap 'rm -rf "$OVERRIDE_DIR"' EXIT
 
@@ -99,7 +100,7 @@ FILE_ARGS+=(--file "$OVERRIDE_FILE")
 # tags / labels / cache / platforms / args for this build are downloadable
 # from the UI for debugging. Upload before bake runs so a failed bake
 # doesn't take the artifact down with it.
-( cd "$OVERRIDE_DIR" && buildkite-agent artifact upload docker-compose.override.yml )
+( cd "$OVERRIDE_DIR" && buildkite-agent artifact upload docker-compose-build-buildkite-plugin.yml )
 
 PUSH_LOAD_ARG=()
 if [[ ${#TAGS[@]} -gt 0 ]]; then

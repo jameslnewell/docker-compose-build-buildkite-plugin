@@ -15,7 +15,7 @@ setup() {
   # runs don't litter /tmp.
   export TMPDIR="${BATS_TEST_TMPDIR:-${TMPDIR:-/tmp}}"
   OVERRIDE_DIR="${TMPDIR}/docker-compose-build-buildkite-plugin-${BUILDKITE_JOB_ID}"
-  OVERRIDE_FILE="${OVERRIDE_DIR}/docker-compose.override.yml"
+  OVERRIDE_FILE="${OVERRIDE_DIR}/docker-compose-build-buildkite-plugin.yml"
   export OVERRIDE_DIR
   export OVERRIDE_FILE
 }
@@ -91,7 +91,7 @@ teardown() {
   stub docker \
     "buildx create --name docker-compose-build-buildkite-plugin-test-job-id --use : true" \
     "buildx bake --builder docker-compose-build-buildkite-plugin-test-job-id --file ${OVERRIDE_FILE} --load web : true"
-  stub buildkite-agent "artifact upload docker-compose.override.yml : true"
+  stub buildkite-agent "artifact upload docker-compose-build-buildkite-plugin.yml : true"
 
   run "$PLUGIN_PATH/hooks/command"
 
@@ -106,7 +106,7 @@ teardown() {
   stub docker \
     "buildx create --name docker-compose-build-buildkite-plugin-test-job-id --use : true" \
     "buildx bake --builder docker-compose-build-buildkite-plugin-test-job-id --file ${OVERRIDE_FILE} --load web : true"
-  stub buildkite-agent "artifact upload docker-compose.override.yml : true"
+  stub buildkite-agent "artifact upload docker-compose-build-buildkite-plugin.yml : true"
 
   run "$PLUGIN_PATH/hooks/command"
 
@@ -123,7 +123,7 @@ teardown() {
   stub docker \
     "buildx create --name docker-compose-build-buildkite-plugin-test-job-id --use : true" \
     "buildx bake --builder docker-compose-build-buildkite-plugin-test-job-id --file ${OVERRIDE_FILE} --load --provenance false --allow fs.read=/tmp/.npmrc web : true"
-  stub buildkite-agent "artifact upload docker-compose.override.yml : true"
+  stub buildkite-agent "artifact upload docker-compose-build-buildkite-plugin.yml : true"
 
   run "$PLUGIN_PATH/hooks/command"
 
@@ -134,7 +134,7 @@ teardown() {
   unset BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CLI_ARGS_3
 }
 
-@test "Uploads the override file as a Buildkite artifact named docker-compose.override.yml" {
+@test "Uploads the override file as a Buildkite artifact named docker-compose-build-buildkite-plugin.yml" {
   # The override carries the resolved tags/labels/cache/platforms/args; making
   # it a downloadable artifact from the build UI is the debugging payoff for
   # generating the file rather than passing every value via --set.
@@ -146,7 +146,7 @@ teardown() {
     "buildx bake --builder docker-compose-build-buildkite-plugin-test-job-id --file ${OVERRIDE_FILE} --push web : true"
   # Stub asserts the upload is invoked with the bare filename from inside the
   # override dir; copy the file so the test can confirm its content later.
-  stub buildkite-agent "artifact upload docker-compose.override.yml : cp docker-compose.override.yml ${CAPTURE_FILE}"
+  stub buildkite-agent "artifact upload docker-compose-build-buildkite-plugin.yml : cp docker-compose-build-buildkite-plugin.yml ${CAPTURE_FILE}"
 
   run "$PLUGIN_PATH/hooks/command"
 
@@ -177,7 +177,7 @@ teardown() {
   stub docker \
     "buildx create --name docker-compose-build-buildkite-plugin-test-job-id --use : true" \
     "buildx bake --builder docker-compose-build-buildkite-plugin-test-job-id --file ${OVERRIDE_FILE} --push web : cp ${OVERRIDE_FILE} ${CAPTURE_FILE}"
-  stub buildkite-agent "artifact upload docker-compose.override.yml : true"
+  stub buildkite-agent "artifact upload docker-compose-build-buildkite-plugin.yml : true"
 
   run "$PLUGIN_PATH/hooks/command"
 
