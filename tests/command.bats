@@ -10,6 +10,11 @@ setup() {
   export PLUGIN_PATH="${BATS_TEST_DIRNAME}/.."
   export BUILDKITE_JOB_ID="test-job-id"
   export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_SERVICE="web"
+  # Sandbox the generated compose override under the test's tmpdir so its path
+  # is deterministic (matches the stub) and so test runs don't litter /tmp.
+  export TMPDIR="${BATS_TEST_TMPDIR:-${TMPDIR:-/tmp}}"
+  OVERRIDE_FILE="${TMPDIR}/docker-compose-build-buildkite-plugin-${BUILDKITE_JOB_ID}.override.yml"
+  export OVERRIDE_FILE
 }
 
 teardown() {
@@ -81,7 +86,7 @@ teardown() {
 
   stub docker \
     "buildx create --name docker-compose-build-buildkite-plugin-test-job-id --use : true" \
-    "buildx bake --builder docker-compose-build-buildkite-plugin-test-job-id --load web : true"
+    "buildx bake --builder docker-compose-build-buildkite-plugin-test-job-id --file ${OVERRIDE_FILE} --load web : true"
 
   run "$PLUGIN_PATH/hooks/command"
 
@@ -95,7 +100,7 @@ teardown() {
 
   stub docker \
     "buildx create --name docker-compose-build-buildkite-plugin-test-job-id --use : true" \
-    "buildx bake --builder docker-compose-build-buildkite-plugin-test-job-id --load web : true"
+    "buildx bake --builder docker-compose-build-buildkite-plugin-test-job-id --file ${OVERRIDE_FILE} --load web : true"
 
   run "$PLUGIN_PATH/hooks/command"
 
@@ -111,7 +116,7 @@ teardown() {
 
   stub docker \
     "buildx create --name docker-compose-build-buildkite-plugin-test-job-id --use : true" \
-    "buildx bake --builder docker-compose-build-buildkite-plugin-test-job-id --load --provenance false --allow fs.read=/tmp/.npmrc web : true"
+    "buildx bake --builder docker-compose-build-buildkite-plugin-test-job-id --file ${OVERRIDE_FILE} --load --provenance false --allow fs.read=/tmp/.npmrc web : true"
 
   run "$PLUGIN_PATH/hooks/command"
 
@@ -120,4 +125,60 @@ teardown() {
   unset BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CLI_ARGS_1
   unset BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CLI_ARGS_2
   unset BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CLI_ARGS_3
+}
+
+@test "Writes args/labels/cache_from/cache_to/platforms/tags into a compose override file" {
+  # Older buildx (< 0.13) doesn't grok `--set name.field+=value` array-append,
+  # so the plugin builds these arrays in a compose override file passed as the
+  # last --file. Verify the YAML the plugin emits is well-formed and contains
+  # the full lists for each option.
+  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_ARGS_0="FOO=1"
+  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_ARGS_1="BAR=2"
+  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_LABELS_0="org.example.k=v"
+  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CACHE_FROM_0="type=registry,ref=a"
+  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CACHE_FROM_1="type=registry,ref=b"
+  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CACHE_TO_0="type=registry,ref=a,mode=max"
+  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_PLATFORMS_0="linux/arm64"
+  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_TAGS_0="img:t1"
+  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_TAGS_1="img:t2"
+
+  # Capture the override file before the EXIT trap nukes it.
+  CAPTURE_FILE="${BATS_TEST_TMPDIR}/captured-override.yml"
+  stub docker \
+    "buildx create --name docker-compose-build-buildkite-plugin-test-job-id --use : true" \
+    "buildx bake --builder docker-compose-build-buildkite-plugin-test-job-id --file ${OVERRIDE_FILE} --push web : cp ${OVERRIDE_FILE} ${CAPTURE_FILE}"
+
+  run "$PLUGIN_PATH/hooks/command"
+
+  assert_success
+  [[ -f "$CAPTURE_FILE" ]]
+  run cat "$CAPTURE_FILE"
+  assert_output --partial "services:"
+  assert_output --partial "  web:"
+  assert_output --partial "    build:"
+  assert_output --partial "      args:"
+  assert_output --partial "        - 'FOO=1'"
+  assert_output --partial "        - 'BAR=2'"
+  assert_output --partial "      labels:"
+  assert_output --partial "        - 'org.example.k=v'"
+  assert_output --partial "      cache_from:"
+  assert_output --partial "        - 'type=registry,ref=a'"
+  assert_output --partial "        - 'type=registry,ref=b'"
+  assert_output --partial "      cache_to:"
+  assert_output --partial "        - 'type=registry,ref=a,mode=max'"
+  assert_output --partial "      platforms:"
+  assert_output --partial "        - 'linux/arm64'"
+  assert_output --partial "      tags:"
+  assert_output --partial "        - 'img:t1'"
+  assert_output --partial "        - 'img:t2'"
+
+  unset BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_ARGS_0
+  unset BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_ARGS_1
+  unset BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_LABELS_0
+  unset BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CACHE_FROM_0
+  unset BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CACHE_FROM_1
+  unset BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CACHE_TO_0
+  unset BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_PLATFORMS_0
+  unset BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_TAGS_0
+  unset BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_TAGS_1
 }

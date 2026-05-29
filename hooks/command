@@ -40,65 +40,55 @@ else
   cd "$ORIGINAL_DIR"
 fi
 
-SET_ARGS=()
-
 mapfile -t BUILD_ARGS < <(plugin_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_ARGS")
-for arg in "${BUILD_ARGS[@]}"; do
-  key="${arg%%=*}"
-  value="${arg#*=}"
-  SET_ARGS+=(--set "${SERVICE}.args.${key}=${value}")
-done
-
 mapfile -t LABELS < <(plugin_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_LABELS")
-for label in "${LABELS[@]}"; do
-  key="${label%%=*}"
-  value="${label#*=}"
-  SET_ARGS+=(--set "${SERVICE}.labels.${key}=${value}")
-done
-
 mapfile -t CACHE_FROM < <(plugin_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CACHE_FROM")
-first=1
-for val in "${CACHE_FROM[@]}"; do
-  if [[ "$first" -eq 1 ]]; then
-    SET_ARGS+=(--set "${SERVICE}.cache-from=${val}")
-    first=0
-  else
-    SET_ARGS+=(--set "${SERVICE}.cache-from+=${val}")
-  fi
-done
-
 mapfile -t CACHE_TO < <(plugin_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CACHE_TO")
-first=1
-for val in "${CACHE_TO[@]}"; do
-  if [[ "$first" -eq 1 ]]; then
-    SET_ARGS+=(--set "${SERVICE}.cache-to=${val}")
-    first=0
-  else
-    SET_ARGS+=(--set "${SERVICE}.cache-to+=${val}")
-  fi
-done
-
 mapfile -t PLATFORMS < <(plugin_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_PLATFORMS")
-first=1
-for val in "${PLATFORMS[@]}"; do
-  if [[ "$first" -eq 1 ]]; then
-    SET_ARGS+=(--set "${SERVICE}.platforms=${val}")
-    first=0
-  else
-    SET_ARGS+=(--set "${SERVICE}.platforms+=${val}")
-  fi
-done
-
 mapfile -t TAGS < <(plugin_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_TAGS")
-first=1
-for val in "${TAGS[@]}"; do
-  if [[ "$first" -eq 1 ]]; then
-    SET_ARGS+=(--set "${SERVICE}.tags=${val}")
-    first=0
-  else
-    SET_ARGS+=(--set "${SERVICE}.tags+=${val}")
-  fi
-done
+
+# Generate a compose override file that carries args/labels/cache_from/cache_to/
+# platforms/tags as full arrays. Older buildx versions (< 0.13) don't support
+# the `--set name.field+=value` array-append syntax, so building the arrays in
+# the compose layer is the portable way to pass them. The override is the
+# last `--file` so it merges last; compose replaces arrays with the override's
+# values, matching the intent of these options as "the final list to use".
+# Path is deterministic per job (BUILDKITE_JOB_ID is unique) for test
+# reproducibility and easy log inspection.
+OVERRIDE_FILE="${TMPDIR:-/tmp}/docker-compose-build-buildkite-plugin-${BUILDKITE_JOB_ID}.override.yml"
+trap 'rm -f "$OVERRIDE_FILE"' EXIT
+
+# YAML-escape: wrap in single quotes, doubling any embedded `'` per YAML spec.
+yaml_single_quote() {
+  local v="${1//\'/\'\'}"
+  printf "'%s'" "$v"
+}
+
+emit_string_list() {
+  local key="$1"; shift
+  (( $# > 0 )) || return 0
+  printf '      %s:\n' "$key"
+  for v in "$@"; do
+    printf '        - %s\n' "$(yaml_single_quote "$v")"
+  done
+}
+
+{
+  printf 'services:\n'
+  printf '  %s:\n' "$SERVICE"
+  printf '    build:\n'
+
+  # args is a list of KEY=VALUE entries — compose accepts both list and map
+  # forms here; list keeps the KEY=VALUE shape the plugin already takes in.
+  emit_string_list args "${BUILD_ARGS[@]}"
+  emit_string_list labels "${LABELS[@]}"
+  emit_string_list cache_from "${CACHE_FROM[@]}"
+  emit_string_list cache_to "${CACHE_TO[@]}"
+  emit_string_list platforms "${PLATFORMS[@]}"
+  emit_string_list tags "${TAGS[@]}"
+} > "$OVERRIDE_FILE"
+
+FILE_ARGS+=(--file "$OVERRIDE_FILE")
 
 PUSH_LOAD_ARG=()
 if [[ ${#TAGS[@]} -gt 0 ]]; then
@@ -115,7 +105,6 @@ set -x
 docker buildx bake \
   --builder "$BUILDER_NAME" \
   "${FILE_ARGS[@]}" \
-  "${SET_ARGS[@]}" \
   "${PUSH_LOAD_ARG[@]}" \
   "${CLI_ARGS[@]}" \
   "${SERVICE}"
