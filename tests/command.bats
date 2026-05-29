@@ -1,88 +1,55 @@
 #!/usr/bin/env bats
 
+source "${BATS_TEST_DIRNAME}/../lib/shared.bash"
+
 setup() {
-  export PLUGIN_COMMAND="${BATS_TEST_DIRNAME}/../hooks/command"
   export PLUGIN_DIR="${BATS_TEST_DIRNAME}/.."
 }
 
-@test "Minimal config with service only" {
-  export BUILDKITE_JOB_ID="test-job-id"
-  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_SERVICE="web"
-
-  run bash "$PLUGIN_COMMAND"
-
-  assert_failure
+@test "plugin_read_list with scalar value" {
+  export MY_VAR="single-value"
+  mapfile -t result < <(plugin_read_list "MY_VAR")
+  [[ "${result[0]}" == "single-value" ]]
 }
 
-@test "Single file specified" {
-  export BUILDKITE_JOB_ID="test-job-id"
-  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_SERVICE="web"
-  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_FILE="docker-compose.yml"
-
-  run bash "$PLUGIN_COMMAND"
-
-  assert_failure
+@test "plugin_read_list with indexed array" {
+  export MY_VAR_0="first"
+  export MY_VAR_1="second"
+  export MY_VAR_2="third"
+  mapfile -t result < <(plugin_read_list "MY_VAR")
+  [[ "${#result[@]}" == "3" ]]
+  [[ "${result[0]}" == "first" ]]
+  [[ "${result[1]}" == "second" ]]
+  [[ "${result[2]}" == "third" ]]
 }
 
-@test "Array of files specified" {
-  export BUILDKITE_JOB_ID="test-job-id"
-  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_SERVICE="web"
-  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_FILE_0="compose.yml"
-  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_FILE_1="compose.override.yml"
-
-  run bash "$PLUGIN_COMMAND"
-
-  assert_failure
+@test "plugin_read_list with empty result" {
+  unset MY_VAR
+  unset MY_VAR_0
+  mapfile -t result < <(plugin_read_list "MY_VAR")
+  [[ "${#result[@]}" == "0" ]]
 }
 
-@test "Tags option enables push" {
-  export BUILDKITE_JOB_ID="test-job-id"
-  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_SERVICE="web"
-  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_TAGS_0="myapp:latest"
-  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_TAGS_1="myapp:v1.0"
-
-  run bash "$PLUGIN_COMMAND"
-
-  assert_failure
-}
-
-@test "No tags uses load" {
-  export BUILDKITE_JOB_ID="test-job-id"
-  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_SERVICE="web"
-
-  run bash "$PLUGIN_COMMAND"
-
-  assert_failure
-}
-
-@test "cache_from array" {
-  export BUILDKITE_JOB_ID="test-job-id"
-  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_SERVICE="web"
-  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CACHE_FROM_0="type=gha"
-  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CACHE_FROM_1="type=local,src=/tmp/cache"
-
-  run bash "$PLUGIN_COMMAND"
-
-  assert_failure
-}
-
-@test "args option" {
-  export BUILDKITE_JOB_ID="test-job-id"
-  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_SERVICE="web"
-  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_ARGS_0="VERSION=1.0"
-  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_ARGS_1="DEBUG=true"
-
-  run bash "$PLUGIN_COMMAND"
-
-  assert_failure
-}
-
-@test "Missing required service option" {
+@test "Command fails when service is missing" {
   export BUILDKITE_JOB_ID="test-job-id"
   unset BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_SERVICE
 
-  run bash "$PLUGIN_COMMAND"
+  run bash "${PLUGIN_DIR}/hooks/command"
 
-  assert_failure
-  assert_output --partial "service"
+  [ $status -eq 1 ]
+  [[ "$output" =~ "service" ]]
+}
+
+@test "Command fails when docker is unavailable" {
+  export BUILDKITE_JOB_ID="test-job-id"
+  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_SERVICE="web"
+  export PATH="/usr/bin:/bin"
+
+  if command -v docker &>/dev/null; then
+    skip "Docker is available, cannot test failure case"
+  fi
+
+  run bash "${PLUGIN_DIR}/hooks/command"
+
+  [ $status -ne 0 ]
 }
