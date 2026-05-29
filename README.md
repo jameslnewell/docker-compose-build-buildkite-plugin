@@ -52,8 +52,8 @@ steps:
 
 The plugin:
 
-1. **Create Builder**: Creates an isolated buildx builder for this job (`docker buildx create`)
-2. **Build**: Renders the `args`/`labels`/`cache_from`/`cache_to`/`platforms`/`tags` arrays into a compose override file, uploads it as a Buildkite artifact named `docker-compose-build-buildkite-plugin.yml` (downloadable from the build UI for debugging), and runs `docker buildx bake` with the user's compose file(s) plus that override
+1. **Configure**: Creates an isolated buildx builder for this job (`docker buildx create`), renders the `args`/`labels`/`cache_from`/`cache_to`/`platforms`/`tags` arrays into a compose override file, and uploads that override as a Buildkite artifact named `docker-compose-build-buildkite-plugin.yml` (downloadable from the build UI for debugging)
+2. **Build**: Runs `docker buildx bake` with the user's compose file(s) plus the generated override
 3. **Cache Preservation**: The builder is not cleaned up, preserving layer cache for successive builds on the same agent
 
 Each phase is a separate log group in Buildkite, so you can see exactly where time is spent.
