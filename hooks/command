@@ -16,12 +16,11 @@ if [[ -n "${BUILDKITE_COMMAND:-}" ]]; then
   echo "Warning: the step's command will not be run — this plugin only builds the image."
 fi
 
-echo "--- :docker: creating builder"
+echo "--- :docker: configuring"
+
 set -x
 docker buildx create --name "$BUILDER_NAME" --use
 { set +x; } 2>/dev/null
-
-echo "+++ :docker: building"
 
 mapfile -t FILES < <(plugin_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_FILE")
 
@@ -113,6 +112,7 @@ fi
 # (e.g. `--provenance false`, `--allow fs.read=<path>`).
 mapfile -t CLI_ARGS < <(plugin_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CLI_ARGS")
 
+echo "+++ :docker: building"
 set -x
 docker buildx bake \
   --builder "$BUILDER_NAME" \
