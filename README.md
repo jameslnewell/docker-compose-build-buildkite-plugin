@@ -20,6 +20,7 @@ Build and push a docker compose service using `docker buildx bake`, with an isol
 | `labels` | array | — | Image labels as `KEY=VALUE` |
 | `tags` | array | — | Image tags |
 | `platforms` | array | — | Target platforms |
+| `cli_args` | array | — | Extra arguments passed through to `docker buildx bake` (e.g. `--provenance`, `false`) |
 
 ## Usage
 
@@ -52,10 +53,12 @@ steps:
 The plugin:
 
 1. **Create Builder**: Creates an isolated buildx builder for this job (`docker buildx create`)
-2. **Build**: Runs `docker buildx bake` with the specified configuration and service
+2. **Build**: Renders the `args`/`labels`/`cache_from`/`cache_to`/`platforms`/`tags` arrays into a compose override file, uploads it as a Buildkite artifact named `docker-compose-build-buildkite-plugin.yml` (downloadable from the build UI for debugging), and runs `docker buildx bake` with the user's compose file(s) plus that override
 3. **Cache Preservation**: The builder is not cleaned up, preserving layer cache for successive builds on the same agent
 
 Each phase is a separate log group in Buildkite, so you can see exactly where time is spent.
+
+The compose override file is used (rather than `--set name.field+=value`) so the plugin works against buildx versions < 0.13, which don't support the array-append `+=` syntax. The artifact upload keeps the resolved values visible — pull `docker-compose-build-buildkite-plugin.yml` from the build's artifacts to see exactly what tags/cache refs/labels/etc were set for this run.
 
 ## Other plugins that may be useful
 
