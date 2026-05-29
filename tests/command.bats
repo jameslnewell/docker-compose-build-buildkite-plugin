@@ -3,8 +3,17 @@
 source "${BATS_TEST_DIRNAME}/../lib/shared.bash"
 
 setup() {
+  load "${BATS_LIB_PATH}/bats-support/load.bash"
+  load "${BATS_LIB_PATH}/bats-assert/load.bash"
+  load "${BATS_LIB_PATH}/bats-mock/stub.bash"
+
   export PLUGIN_PATH="${BATS_TEST_DIRNAME}/.."
   export BUILDKITE_JOB_ID="test-job-id"
+  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_SERVICE="web"
+}
+
+teardown() {
+  unstub docker 2>/dev/null || true
 }
 
 @test "script has valid bash syntax" {
@@ -42,7 +51,6 @@ setup() {
 }
 
 @test "Command fails when docker is unavailable" {
-  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_SERVICE="web"
   export PATH="/usr/bin:/bin"
 
   if command -v docker &>/dev/null; then
@@ -52,4 +60,31 @@ setup() {
   run bash "$PLUGIN_PATH/hooks/command"
 
   [ $status -ne 0 ]
+}
+
+@test "Warns when step has a command" {
+  export BUILDKITE_COMMAND="make build"
+
+  stub docker \
+    "buildx create --name docker-compose-build-buildkite-plugin-test-job-id --use : true" \
+    "buildx bake --builder docker-compose-build-buildkite-plugin-test-job-id --load web : true"
+
+  run "$PLUGIN_PATH/hooks/command"
+
+  assert_success
+  assert_output --partial "Warning:"
+  unset BUILDKITE_COMMAND
+}
+
+@test "No warning when step has no command" {
+  unset BUILDKITE_COMMAND
+
+  stub docker \
+    "buildx create --name docker-compose-build-buildkite-plugin-test-job-id --use : true" \
+    "buildx bake --builder docker-compose-build-buildkite-plugin-test-job-id --load web : true"
+
+  run "$PLUGIN_PATH/hooks/command"
+
+  assert_success
+  refute_output --partial "Warning:"
 }

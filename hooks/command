@@ -12,6 +12,10 @@ fi
 
 BUILDER_NAME="docker-compose-build-buildkite-plugin-${BUILDKITE_JOB_ID}"
 
+if [[ -n "${BUILDKITE_COMMAND:-}" ]]; then
+  echo "Warning: the step's command will not be run — this plugin only builds the image."
+fi
+
 echo "--- :docker: creating builder"
 set -x
 docker buildx create --name "$BUILDER_NAME" --use
