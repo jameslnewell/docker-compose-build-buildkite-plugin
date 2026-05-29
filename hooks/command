@@ -12,10 +12,12 @@ fi
 
 BUILDER_NAME="docker-compose-build-buildkite-plugin-${BUILDKITE_JOB_ID}"
 
-echo "--- :docker: Creating builder"
+echo "--- :docker: creating builder"
+set -x
 docker buildx create --name "$BUILDER_NAME" --use
+{ set +x; } 2>/dev/null
 
-echo "+++ :docker: Building ${SERVICE}"
+echo "+++ :docker: building"
 
 mapfile -t FILES < <(plugin_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_FILE")
 
@@ -101,9 +103,11 @@ else
   PUSH_LOAD_ARG=(--load)
 fi
 
+set -x
 docker buildx bake \
   --builder "$BUILDER_NAME" \
   "${FILE_ARGS[@]}" \
   "${SET_ARGS[@]}" \
   "${PUSH_LOAD_ARG[@]}" \
   "${SERVICE}"
+{ set +x; } 2>/dev/null
