@@ -46,3 +46,18 @@ steps:
 
 - An isolated buildx builder is created per Buildkite job and is not cleaned up after the step. This preserves layer cache for successive steps on the same agent. The agent's prune operations will eventually clean up old builders.
 - If `tags` are provided, `--push` is used; otherwise `--load` is used.
+
+## How It Works
+
+The plugin:
+
+1. **Create Builder**: Creates an isolated buildx builder for this job (`docker buildx create`)
+2. **Build**: Runs `docker buildx bake` with the specified configuration and service
+3. **Cache Preservation**: The builder is not cleaned up, preserving layer cache for successive builds on the same agent
+
+Each phase is a separate log group in Buildkite, so you can see exactly where time is spent.
+
+## Other plugins that may be useful
+
+- [docker-run](https://github.com/jameslnewell/docker-run-buildkite-plugin) — Run a command in a Docker image with phase-level timing and automatic cleanup
+- [docker-compose-run](https://github.com/jameslnewell/docker-compose-run-buildkite-plugin) — Run a docker compose service with phase-level timing and automatic cleanup

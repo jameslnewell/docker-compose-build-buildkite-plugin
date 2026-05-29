@@ -3,7 +3,12 @@
 source "${BATS_TEST_DIRNAME}/../lib/shared.bash"
 
 setup() {
-  export PLUGIN_DIR="${BATS_TEST_DIRNAME}/.."
+  export PLUGIN_PATH="${BATS_TEST_DIRNAME}/.."
+  export BUILDKITE_JOB_ID="test-job-id"
+}
+
+@test "script has valid bash syntax" {
+  bash -n "$PLUGIN_PATH/hooks/command"
 }
 
 @test "plugin_read_list with scalar value" {
@@ -28,17 +33,15 @@ setup() {
 }
 
 @test "Command fails when service is missing" {
-  export BUILDKITE_JOB_ID="test-job-id"
   unset BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_SERVICE
 
-  run bash "${PLUGIN_DIR}/hooks/command"
+  run bash "$PLUGIN_PATH/hooks/command"
 
   [ $status -eq 1 ]
   [[ "$output" =~ "service" ]]
 }
 
 @test "Command fails when docker is unavailable" {
-  export BUILDKITE_JOB_ID="test-job-id"
   export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_SERVICE="web"
   export PATH="/usr/bin:/bin"
 
@@ -46,7 +49,7 @@ setup() {
     skip "Docker is available, cannot test failure case"
   fi
 
-  run bash "${PLUGIN_DIR}/hooks/command"
+  run bash "$PLUGIN_PATH/hooks/command"
 
   [ $status -ne 0 ]
 }
