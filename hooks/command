@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PLUGIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "${PLUGIN_DIR}/lib/shared.bash"
+
+SERVICE="${BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_SERVICE:-}"
+if [[ -z "$SERVICE" ]]; then
+  echo "Error: 'service' is required" >&2
+  exit 1
+fi
+
+BUILDER_NAME="docker-compose-build-buildkite-plugin-${BUILDKITE_JOB_ID}"
+
+echo "--- :docker: Creating builder"
+docker buildx create --name "$BUILDER_NAME" --use
+
+echo "+++ :docker: Building ${SERVICE}"
+
+mapfile -t FILES < <(plugin_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_FILE")
+
+FILE_ARGS=()
+ORIGINAL_DIR="$PWD"
+
+if [[ ${#FILES[@]} -gt 0 ]]; then
+  FIRST_FILE_DIR="$(cd "$(dirname "${FILES[0]}")" && pwd)"
+  cd "$FIRST_FILE_DIR"
+
+  FILE_ARGS=()
+  for f in "${FILES[@]}"; do
+    FILE_ARGS+=(--file "$(cd "$ORIGINAL_DIR" && realpath "$f")")
+  done
+else
+  cd "$ORIGINAL_DIR"
+fi
+
+SET_ARGS=()
+
+mapfile -t BUILD_ARGS < <(plugin_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_ARGS")
+for arg in "${BUILD_ARGS[@]}"; do
+  key="${arg%%=*}"
+  value="${arg#*=}"
+  SET_ARGS+=(--set "${SERVICE}.args.${key}=${value}")
+done
+
+mapfile -t LABELS < <(plugin_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_LABELS")
+for label in "${LABELS[@]}"; do
+  key="${label%%=*}"
+  value="${label#*=}"
+  SET_ARGS+=(--set "${SERVICE}.labels.${key}=${value}")
+done
+
+mapfile -t CACHE_FROM < <(plugin_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CACHE_FROM")
+first=1
+for val in "${CACHE_FROM[@]}"; do
+  if [[ "$first" -eq 1 ]]; then
+    SET_ARGS+=(--set "${SERVICE}.cache-from=${val}")
+    first=0
+  else
+    SET_ARGS+=(--set "${SERVICE}.cache-from+=${val}")
+  fi
+done
+
+mapfile -t CACHE_TO < <(plugin_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CACHE_TO")
+first=1
+for val in "${CACHE_TO[@]}"; do
+  if [[ "$first" -eq 1 ]]; then
+    SET_ARGS+=(--set "${SERVICE}.cache-to=${val}")
+    first=0
+  else
+    SET_ARGS+=(--set "${SERVICE}.cache-to+=${val}")
+  fi
+done
+
+mapfile -t PLATFORMS < <(plugin_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_PLATFORMS")
+first=1
+for val in "${PLATFORMS[@]}"; do
+  if [[ "$first" -eq 1 ]]; then
+    SET_ARGS+=(--set "${SERVICE}.platforms=${val}")
+    first=0
+  else
+    SET_ARGS+=(--set "${SERVICE}.platforms+=${val}")
+  fi
+done
+
+mapfile -t TAGS < <(plugin_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_TAGS")
+first=1
+for val in "${TAGS[@]}"; do
+  if [[ "$first" -eq 1 ]]; then
+    SET_ARGS+=(--set "${SERVICE}.tags=${val}")
+    first=0
+  else
+    SET_ARGS+=(--set "${SERVICE}.tags+=${val}")
+  fi
+done
+
+PUSH_LOAD_ARG=()
+if [[ ${#TAGS[@]} -gt 0 ]]; then
+  PUSH_LOAD_ARG=(--push)
+else
+  PUSH_LOAD_ARG=(--load)
+fi
+
+docker buildx bake \
+  --builder "$BUILDER_NAME" \
+  "${FILE_ARGS[@]}" \
+  "${SET_ARGS[@]}" \
+  "${PUSH_LOAD_ARG[@]}" \
+  "${SERVICE}"

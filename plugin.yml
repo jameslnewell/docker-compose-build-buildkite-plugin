@@ -1,0 +1,36 @@
+name: Docker Compose Build
+description: Build and push a docker compose service using buildx bake
+author: https://github.com/jameslnewell
+requirements:
+  - docker
+configuration:
+  properties:
+    file:
+      type:
+        - string
+        - array
+      description: "Docker compose file(s)"
+    service:
+      type: string
+      description: "Service to build (required)"
+    args:
+      type: array
+      description: "Build args as KEY=VALUE"
+    cache_from:
+      type: array
+      description: "Cache sources"
+    cache_to:
+      type: array
+      description: "Cache destinations"
+    labels:
+      type: array
+      description: "Image labels as KEY=VALUE"
+    tags:
+      type: array
+      description: "Image tags"
+    platforms:
+      type: array
+      description: "Target platforms"
+  required:
+    - service
+  additionalProperties: false
