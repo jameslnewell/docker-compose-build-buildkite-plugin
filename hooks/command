@@ -107,11 +107,16 @@ else
   PUSH_LOAD_ARG=(--load)
 fi
 
+# Escape hatch for bake flags this plugin doesn't model as a first-class option
+# (e.g. `--provenance false`, `--allow fs.read=<path>`).
+mapfile -t CLI_ARGS < <(plugin_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CLI_ARGS")
+
 set -x
 docker buildx bake \
   --builder "$BUILDER_NAME" \
   "${FILE_ARGS[@]}" \
   "${SET_ARGS[@]}" \
   "${PUSH_LOAD_ARG[@]}" \
+  "${CLI_ARGS[@]}" \
   "${SERVICE}"
 { set +x; } 2>/dev/null

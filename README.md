@@ -20,6 +20,7 @@ Build and push a docker compose service using `docker buildx bake`, with an isol
 | `labels` | array | — | Image labels as `KEY=VALUE` |
 | `tags` | array | — | Image tags |
 | `platforms` | array | — | Target platforms |
+| `cli_args` | array | — | Extra arguments passed through to `docker buildx bake` (e.g. `--provenance`, `false`) |
 
 ## Usage
 

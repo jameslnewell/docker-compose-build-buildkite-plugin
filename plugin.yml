@@ -31,6 +31,9 @@ configuration:
     platforms:
       type: array
       description: "Target platforms"
+    cli_args:
+      type: array
+      description: "Extra arguments passed through to `docker buildx bake` (e.g. `--provenance`, `false`)"
   required:
     - service
   additionalProperties: false

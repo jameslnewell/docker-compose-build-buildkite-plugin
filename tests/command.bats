@@ -102,3 +102,22 @@ teardown() {
   assert_success
   refute_output --partial "Warning:"
 }
+
+@test "Passes cli_args through to bake" {
+  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CLI_ARGS_0="--provenance"
+  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CLI_ARGS_1="false"
+  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CLI_ARGS_2="--allow"
+  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CLI_ARGS_3="fs.read=/tmp/.npmrc"
+
+  stub docker \
+    "buildx create --name docker-compose-build-buildkite-plugin-test-job-id --use : true" \
+    "buildx bake --builder docker-compose-build-buildkite-plugin-test-job-id --load --provenance false --allow fs.read=/tmp/.npmrc web : true"
+
+  run "$PLUGIN_PATH/hooks/command"
+
+  assert_success
+  unset BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CLI_ARGS_0
+  unset BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CLI_ARGS_1
+  unset BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CLI_ARGS_2
+  unset BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CLI_ARGS_3
+}
