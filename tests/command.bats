@@ -90,7 +90,7 @@ teardown() {
 
   stub docker \
     "buildx create --name docker-compose-build-buildkite-plugin-test-job-id --use : true" \
-    "buildx bake --builder docker-compose-build-buildkite-plugin-test-job-id --file ${OVERRIDE_FILE} --load web : true"
+    "buildx bake --progress=plain --builder docker-compose-build-buildkite-plugin-test-job-id --file ${OVERRIDE_FILE} --load web : true"
   stub buildkite-agent "artifact upload docker-compose-build-buildkite-plugin.yml : true"
 
   run "$PLUGIN_PATH/hooks/command"
@@ -105,7 +105,7 @@ teardown() {
 
   stub docker \
     "buildx create --name docker-compose-build-buildkite-plugin-test-job-id --use : true" \
-    "buildx bake --builder docker-compose-build-buildkite-plugin-test-job-id --file ${OVERRIDE_FILE} --load web : true"
+    "buildx bake --progress=plain --builder docker-compose-build-buildkite-plugin-test-job-id --file ${OVERRIDE_FILE} --load web : true"
   stub buildkite-agent "artifact upload docker-compose-build-buildkite-plugin.yml : true"
 
   run "$PLUGIN_PATH/hooks/command"
@@ -122,7 +122,7 @@ teardown() {
 
   stub docker \
     "buildx create --name docker-compose-build-buildkite-plugin-test-job-id --use : true" \
-    "buildx bake --builder docker-compose-build-buildkite-plugin-test-job-id --file ${OVERRIDE_FILE} --load --provenance false --allow fs.read=/tmp/.npmrc web : true"
+    "buildx bake --progress=plain --builder docker-compose-build-buildkite-plugin-test-job-id --file ${OVERRIDE_FILE} --load --provenance false --allow fs.read=/tmp/.npmrc web : true"
   stub buildkite-agent "artifact upload docker-compose-build-buildkite-plugin.yml : true"
 
   run "$PLUGIN_PATH/hooks/command"
@@ -143,7 +143,7 @@ teardown() {
   CAPTURE_FILE="${BATS_TEST_TMPDIR}/captured-upload.yml"
   stub docker \
     "buildx create --name docker-compose-build-buildkite-plugin-test-job-id --use : true" \
-    "buildx bake --builder docker-compose-build-buildkite-plugin-test-job-id --file ${OVERRIDE_FILE} --push web : true"
+    "buildx bake --progress=plain --builder docker-compose-build-buildkite-plugin-test-job-id --file ${OVERRIDE_FILE} --push web : true"
   # Stub asserts the upload is invoked with the bare filename from inside the
   # override dir; copy the file so the test can confirm its content later.
   stub buildkite-agent "artifact upload docker-compose-build-buildkite-plugin.yml : cp docker-compose-build-buildkite-plugin.yml ${CAPTURE_FILE}"
@@ -176,7 +176,7 @@ teardown() {
   CAPTURE_FILE="${BATS_TEST_TMPDIR}/captured-override.yml"
   stub docker \
     "buildx create --name docker-compose-build-buildkite-plugin-test-job-id --use : true" \
-    "buildx bake --builder docker-compose-build-buildkite-plugin-test-job-id --file ${OVERRIDE_FILE} --push web : cp ${OVERRIDE_FILE} ${CAPTURE_FILE}"
+    "buildx bake --progress=plain --builder docker-compose-build-buildkite-plugin-test-job-id --file ${OVERRIDE_FILE} --push web : cp ${OVERRIDE_FILE} ${CAPTURE_FILE}"
   stub buildkite-agent "artifact upload docker-compose-build-buildkite-plugin.yml : true"
 
   run "$PLUGIN_PATH/hooks/command"

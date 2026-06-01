@@ -115,6 +115,7 @@ mapfile -t CLI_ARGS < <(plugin_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_
 echo "+++ :docker: building"
 set -x
 docker buildx bake \
+  --progress=plain \
   --builder "$BUILDER_NAME" \
   "${FILE_ARGS[@]}" \
   "${PUSH_LOAD_ARG[@]}" \
