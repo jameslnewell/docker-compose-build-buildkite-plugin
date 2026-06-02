@@ -114,6 +114,26 @@ teardown() {
   refute_output --partial "Warning:"
 }
 
+@test "xtrace prefix never collides with Buildkite log-group markers" {
+  unset BUILDKITE_COMMAND
+
+  stub docker \
+    "buildx create --name docker-compose-build-buildkite-plugin-test-job-id --use : true" \
+    "buildx bake --progress=plain --builder docker-compose-build-buildkite-plugin-test-job-id --file ${OVERRIDE_FILE} --load web : true"
+  stub buildkite-agent "artifact upload docker-compose-build-buildkite-plugin.yml : true"
+
+  # The agent sources this hook, so set -x runs deep enough that the default
+  # PS4='+ ' would trace as a run of '+' (e.g. '+++ docker ...') — which
+  # Buildkite parses as a log-group header. Source the hook to reproduce that
+  # nesting and assert no traced docker command begins with a ---/+++/~~~ marker.
+  # Legit headers ("+++ :docker: building") are fine; only flag a marker
+  # immediately followed by a traced "docker" command.
+  run bash -c "source \"$PLUGIN_PATH/hooks/command\" 2>&1"
+
+  assert_success
+  refute_line --regexp '^[-+~]+ docker '
+}
+
 @test "Passes cli_args through to bake" {
   export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CLI_ARGS_0="--provenance"
   export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CLI_ARGS_1="false"
