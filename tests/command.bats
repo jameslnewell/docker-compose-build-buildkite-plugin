@@ -132,6 +132,9 @@ teardown() {
 
   assert_success
   refute_line --regexp '^[-+~]+ docker '
+  # Empty PS4 means traced commands start at column 0 with no prefix at all —
+  # lock that in so we don't regress to an indented prefix.
+  assert_line --regexp '^docker buildx'
 }
 
 @test "Passes cli_args through to bake" {
