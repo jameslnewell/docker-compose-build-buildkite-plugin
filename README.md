@@ -1,91 +1,108 @@
 # Docker Compose Build Buildkite Plugin
 
-Build and push a docker compose service using `docker buildx bake`, with an isolated buildx builder per job and no post-build cleanup to preserve layer cache for successive steps.
+A [Buildkite plugin](https://buildkite.com/docs/plugins) that builds — and optionally pushes — a Docker Compose service with `docker buildx bake`.
+
+Each build gets its own buildx builder, and the builder is deliberately left behind so later steps on the same agent reuse its layer cache.
 
 ## Requirements
 
-- Docker 25.0+
-- Docker Buildx 0.15+
-- Docker Compose 2.9+
-
-## Configuration
-
-| Option | Type | Required | Description |
-|--------|------|----------|-------------|
-| `file` | string or array | — | Docker compose file(s) |
-| `service` | string | ✓ | Service to build |
-| `args` | array | — | Build args as `KEY=VALUE` |
-| `cache_from` | array | — | Cache sources |
-| `cache_to` | array | — | Cache destinations |
-| `labels` | array | — | Image labels as `KEY=VALUE` |
-| `tags` | array | — | Image tags |
-| `platforms` | array | — | Target platforms |
-| `cli_args` | array | — | Extra arguments passed through to `docker buildx bake` (e.g. `--provenance`, `false`) |
+- The `docker` CLI with Buildx (`docker buildx`) available to the Buildkite agent. Compose files are read by `bake` directly, so the Compose CLI plugin is not required.
+- The `buildkite-agent` CLI on `PATH`, used to upload the generated compose override as an artifact.
 
 ## Usage
 
+Build a service and load the image into the agent's Docker daemon:
+
 ```yaml
 steps:
-  - command: "echo Building"
-    plugins:
-      - jameslnewell/docker-compose-build#v1.0.0:
+  - plugins:
+      - jameslnewell/docker-compose-build#v0.3.1:
+          service: web
+```
+
+Tag the image to push it to a registry instead:
+
+```yaml
+steps:
+  - plugins:
+      - jameslnewell/docker-compose-build#v0.3.1:
           service: web
           file: docker-compose.yml
           tags:
-            - myapp:latest
-            - myapp:${BUILDKITE_COMMIT:0:7}
+            - myregistry.io/myapp:latest
+            - myregistry.io/myapp:${BUILDKITE_COMMIT}
           platforms:
             - linux/amd64
             - linux/arm64
           cache_from:
-            - type=gha
+            - type=registry,ref=myregistry.io/myapp:cache
           cache_to:
-            - type=gha,mode=max
+            - type=registry,ref=myregistry.io/myapp:cache,mode=max
 ```
 
-## Notes
+Pass build args and labels:
 
-- An isolated buildx builder is created per Buildkite job and is not cleaned up after the step. This preserves layer cache for successive steps on the same agent. The agent's prune operations will eventually clean up old builders.
-- If `tags` are provided, `--push` is used; otherwise `--load` is used.
+```yaml
+steps:
+  - plugins:
+      - jameslnewell/docker-compose-build#v0.3.1:
+          service: api
+          args:
+            - NODE_ENV=production
+            - VCS_REF=${BUILDKITE_COMMIT}
+          labels:
+            - org.opencontainers.image.revision=${BUILDKITE_COMMIT}
+            - org.opencontainers.image.source=https://github.com/example/repo
+```
 
-## How It Works
+Pass a bake flag the plugin doesn't model as a first-class option — each array item is one argv token:
 
-The plugin:
+```yaml
+steps:
+  - plugins:
+      - jameslnewell/docker-compose-build#v0.3.1:
+          service: web
+          cli_args:
+            - --provenance
+            - "false"
+```
 
-1. **Configure**: Creates an isolated buildx builder for this job (`docker buildx create`), renders the `args`/`labels`/`cache_from`/`cache_to`/`platforms`/`tags` arrays into a compose override file, and uploads that override as a Buildkite artifact named `docker-compose-build-buildkite-plugin.yml` (downloadable from the build UI for debugging)
-2. **Build**: Runs `docker buildx bake` with the user's compose file(s) plus the generated override
-3. **Cache Preservation**: The builder is not cleaned up, preserving layer cache for successive builds on the same agent
+## Configuration
 
-Each phase is a separate log group in Buildkite, so you can see exactly where time is spent.
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `service` | string | — | **Required.** Compose service to build. Also the bake target. |
+| `file` | string or array | bake's own file discovery (`compose.yaml`, `docker-compose.yml`, `docker-bake.hcl`, …) | Compose file(s), passed through as `--file`. Later files override earlier ones. Bake runs from the first file's directory, so relative build contexts resolve against it. |
+| `args` | array | — | Build args as `KEY=VALUE`, set as the service's `build.args`. |
+| `labels` | array | — | Image labels as `KEY=VALUE`, set as the service's `build.labels`. |
+| `tags` | array | — | Image tags, set as the service's `build.tags`. Providing any tag switches the build from `--load` to `--push`. |
+| `platforms` | array | — | Target platforms (e.g. `linux/amd64`), set as the service's `build.platforms`. |
+| `cache_from` | array | — | Cache sources (e.g. `type=registry,ref=…`), set as the service's `build.cache_from`. |
+| `cache_to` | array | — | Cache destinations (e.g. `type=registry,ref=…,mode=max`), set as the service's `build.cache_to`. |
+| `cli_args` | array | — | Extra flags passed straight through to `docker buildx bake` (e.g. `["--provenance", "false"]`). Each array item is one argv token. |
 
-The compose override file is used (rather than `--set name.field+=value`) so the plugin works against buildx versions < 0.13, which don't support the array-append `+=` syntax. The artifact upload keeps the resolved values visible — pull `docker-compose-build-buildkite-plugin.yml` from the build's artifacts to see exactly what tags/cache refs/labels/etc were set for this run.
+`additionalProperties` is disabled, so an unrecognised or misspelled option fails validation rather than being silently ignored.
+
+Every array option **replaces** the equivalent field in your compose file rather than appending to it — the values you give here are the final list used for the build.
+
+This plugin only builds; it does not run the step's command. A step that sets both prints a warning and the command is ignored — run it in a separate step, or use [docker-compose-run](https://github.com/jameslnewell/docker-compose-run-buildkite-plugin).
+
+## How it works
+
+1. **Configure** — creates a buildx builder named `docker-compose-build-buildkite-plugin-<job id>` and selects it, renders `args`/`labels`/`cache_from`/`cache_to`/`platforms`/`tags` into a compose override file, and uploads that override as the Buildkite artifact `docker-compose-build-buildkite-plugin.yml`.
+2. **Build** — runs `docker buildx bake` against your compose file(s) plus the generated override, with `--push` when `tags` are set and `--load` otherwise.
+
+Each phase is its own log group, so you can fold and expand them independently and see exactly where time is spent.
+
+The builder is **not** removed after the build, so successive steps on the same agent reuse its layer cache. The agent's own prune operations eventually clean up old builders.
+
+The override is uploaded before the build starts, so a failed build still leaves it in the build's artifacts — download `docker-compose-build-buildkite-plugin.yml` to see exactly which tags, cache refs, labels, platforms and args were used for that run.
 
 ## Other plugins that may be useful
 
 - [docker-run](https://github.com/jameslnewell/docker-run-buildkite-plugin) — Run a command in a Docker image with phase-level timing and automatic cleanup
 - [docker-compose-run](https://github.com/jameslnewell/docker-compose-run-buildkite-plugin) — Run a docker compose service with phase-level timing and automatic cleanup
 
-## Testing
+## Contributing
 
-Tests are written using [bats](https://github.com/bats-core/bats-core). The unit tests stub Docker commands and require [bats-support](https://github.com/bats-core/bats-support), [bats-assert](https://github.com/bats-core/bats-assert), and [bats-mock](https://github.com/buildkite-plugins/bats-mock).
-
-Install the dependencies (macOS):
-
-```bash
-brew tap bats-core/bats-core
-brew install bash bats-core bats-core/bats-core/bats-support bats-core/bats-core/bats-assert
-# bats-mock is not in Homebrew — clone it alongside the others:
-git clone https://github.com/buildkite-plugins/bats-mock "$(brew --prefix)/lib/bats-mock"
-```
-
-Run the unit tests (no Docker required):
-
-```bash
-PATH="$(brew --prefix)/bin:$PATH" BATS_LIB_PATH="$(brew --prefix)/lib" bats tests/command.bats
-```
-
-Run the integration tests (requires Docker and Docker Buildx):
-
-```bash
-bats tests/integration.bats
-```
+See [DEVELOPMENT.md](./DEVELOPMENT.md) for how to run the tests and cut a release.

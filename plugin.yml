@@ -27,7 +27,7 @@ configuration:
       description: "Image labels as KEY=VALUE"
     tags:
       type: array
-      description: "Image tags"
+      description: "Image tags. Providing any tag switches the build from --load to --push"
     platforms:
       type: array
       description: "Target platforms"
