@@ -63,7 +63,13 @@ jobs:
           # A skip in this job means a test quietly stopped running, which is the
           # failure this job exists to prevent: tests/integration.bats reported green
           # for its entire life by skipping in the only place it was ever run.
-          if grep -iE '^ok .*# skip' "$RUNNER_TEMP/results.tap"; then
+          #
+          # "Command fails when docker is unavailable" is the one legitimate exception:
+          # it asserts what the hook does when docker is missing, so it can only run
+          # where docker is absent — which is the plugin-tester job, not this one. It
+          # is excluded by name rather than by loosening the check.
+          if grep -iE '^ok .*# skip' "$RUNNER_TEMP/results.tap" \
+             | grep -v 'Command fails when docker is unavailable'; then
             echo "::error::Tests skipped in the job that is meant to run all of them (listed above)"
             exit 1
           fi
