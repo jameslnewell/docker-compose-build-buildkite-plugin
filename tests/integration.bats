@@ -93,10 +93,22 @@ EOF
   export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_SERVICE="test"
   export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_FILE="$TEST_TMPDIR/docker-compose.yml"
   export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_TAGS_0="test-image:custom-tag"
+  # Any tag switches the build from --load to --push, so actually building here
+  # would need a registry to push to — and the builder this plugin creates uses
+  # the docker-container driver, which cannot reach a registry on the host
+  # without networking options the plugin does not expose. `bake --print`
+  # resolves the compose files, the generated override and the tag list into the
+  # final build definition and prints it instead of building, which is the part
+  # this test is about. It still exercises the real merge, not a stub.
+  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CLI_ARGS_0="--print"
 
   run bash "$PLUGIN_PATH/hooks/command"
 
   [[ $status -eq 0 ]]
+  # The tag reached the resolved build definition...
+  [[ "$output" == *'"test-image:custom-tag"'* ]]
+  # ...and having one selected a push rather than a load.
+  [[ "$output" == *'"push": "true"'* ]]
 }
 
 @test "integration: fails when service does not exist" {
