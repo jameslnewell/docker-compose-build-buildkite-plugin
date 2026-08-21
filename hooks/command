@@ -70,7 +70,6 @@ mapfile -t TAGS < <(plugin_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_TAGS
 # `docker-compose.override.yml` filename that compose auto-loads.
 OVERRIDE_DIR="${TMPDIR:-/tmp}/docker-compose-build-buildkite-plugin-${BUILDKITE_JOB_ID}"
 OVERRIDE_FILE="${OVERRIDE_DIR}/docker-compose-build-buildkite-plugin.yml"
-mkdir -p "$OVERRIDE_DIR"
 trap 'rm -rf "$OVERRIDE_DIR"' EXIT
 
 # YAML-escape: wrap in single quotes, doubling any embedded `'` per YAML spec.
@@ -88,28 +87,39 @@ emit_string_list() {
   done
 }
 
-{
-  printf 'services:\n'
-  printf '  %s:\n' "$SERVICE"
-  printf '    build:\n'
+# Only write an override when there is something to put in it. `build:` with
+# nothing indented under it is YAML null, and compose rejects the merged config
+# with "invalid type <nil> for build" — which broke this plugin's most basic
+# usage: a service and a file, with none of the optional lists set. A file that
+# overrides nothing has no purpose anyway, and not writing one keeps a service
+# that does not exist missing, rather than one this override brings into being.
+if (( ${#BUILD_ARGS[@]} + ${#LABELS[@]} + ${#CACHE_FROM[@]} \
+      + ${#CACHE_TO[@]} + ${#PLATFORMS[@]} + ${#TAGS[@]} > 0 )); then
+  mkdir -p "$OVERRIDE_DIR"
 
-  # args is a list of KEY=VALUE entries — compose accepts both list and map
-  # forms here; list keeps the KEY=VALUE shape the plugin already takes in.
-  emit_string_list args "${BUILD_ARGS[@]}"
-  emit_string_list labels "${LABELS[@]}"
-  emit_string_list cache_from "${CACHE_FROM[@]}"
-  emit_string_list cache_to "${CACHE_TO[@]}"
-  emit_string_list platforms "${PLATFORMS[@]}"
-  emit_string_list tags "${TAGS[@]}"
-} > "$OVERRIDE_FILE"
+  {
+    printf 'services:\n'
+    printf '  %s:\n' "$SERVICE"
+    printf '    build:\n'
 
-FILE_ARGS+=(--file "$OVERRIDE_FILE")
+    # args is a list of KEY=VALUE entries — compose accepts both list and map
+    # forms here; list keeps the KEY=VALUE shape the plugin already takes in.
+    emit_string_list args "${BUILD_ARGS[@]}"
+    emit_string_list labels "${LABELS[@]}"
+    emit_string_list cache_from "${CACHE_FROM[@]}"
+    emit_string_list cache_to "${CACHE_TO[@]}"
+    emit_string_list platforms "${PLATFORMS[@]}"
+    emit_string_list tags "${TAGS[@]}"
+  } > "$OVERRIDE_FILE"
 
-# Surface the generated override as a Buildkite artifact so the resolved
-# tags / labels / cache / platforms / args for this build are downloadable
-# from the UI for debugging. Upload before bake runs so a failed bake
-# doesn't take the artifact down with it.
-( cd "$OVERRIDE_DIR" && buildkite-agent artifact upload docker-compose-build-buildkite-plugin.yml )
+  FILE_ARGS+=(--file "$OVERRIDE_FILE")
+
+  # Surface the generated override as a Buildkite artifact so the resolved
+  # tags / labels / cache / platforms / args for this build are downloadable
+  # from the UI for debugging. Upload before bake runs so a failed bake
+  # doesn't take the artifact down with it.
+  ( cd "$OVERRIDE_DIR" && buildkite-agent artifact upload docker-compose-build-buildkite-plugin.yml )
+fi
 
 PUSH_LOAD_ARG=()
 if [[ ${#TAGS[@]} -gt 0 ]]; then
