@@ -90,8 +90,7 @@ teardown() {
 
   stub docker \
     "buildx create --name docker-compose-build-buildkite-plugin-test-job-id --use : true" \
-    "buildx bake --progress=plain --builder docker-compose-build-buildkite-plugin-test-job-id --file ${OVERRIDE_FILE} --load web : true"
-  stub buildkite-agent "artifact upload docker-compose-build-buildkite-plugin.yml : true"
+    "buildx bake --progress=plain --builder docker-compose-build-buildkite-plugin-test-job-id --load web : true"
 
   run "$PLUGIN_PATH/hooks/command"
 
@@ -105,8 +104,7 @@ teardown() {
 
   stub docker \
     "buildx create --name docker-compose-build-buildkite-plugin-test-job-id --use : true" \
-    "buildx bake --progress=plain --builder docker-compose-build-buildkite-plugin-test-job-id --file ${OVERRIDE_FILE} --load web : true"
-  stub buildkite-agent "artifact upload docker-compose-build-buildkite-plugin.yml : true"
+    "buildx bake --progress=plain --builder docker-compose-build-buildkite-plugin-test-job-id --load web : true"
 
   run "$PLUGIN_PATH/hooks/command"
 
@@ -119,8 +117,7 @@ teardown() {
 
   stub docker \
     "buildx create --name docker-compose-build-buildkite-plugin-test-job-id --use : true" \
-    "buildx bake --progress=plain --builder docker-compose-build-buildkite-plugin-test-job-id --file ${OVERRIDE_FILE} --load web : true"
-  stub buildkite-agent "artifact upload docker-compose-build-buildkite-plugin.yml : true"
+    "buildx bake --progress=plain --builder docker-compose-build-buildkite-plugin-test-job-id --load web : true"
 
   # The agent sources this hook, so set -x runs deep enough that the default
   # PS4='+ ' would trace as a run of '+' (e.g. '+++ docker ...') — which
@@ -145,8 +142,7 @@ teardown() {
 
   stub docker \
     "buildx create --name docker-compose-build-buildkite-plugin-test-job-id --use : true" \
-    "buildx bake --progress=plain --builder docker-compose-build-buildkite-plugin-test-job-id --file ${OVERRIDE_FILE} --load --provenance false --allow fs.read=/tmp/.npmrc web : true"
-  stub buildkite-agent "artifact upload docker-compose-build-buildkite-plugin.yml : true"
+    "buildx bake --progress=plain --builder docker-compose-build-buildkite-plugin-test-job-id --load --provenance false --allow fs.read=/tmp/.npmrc web : true"
 
   run "$PLUGIN_PATH/hooks/command"
 
@@ -155,6 +151,25 @@ teardown() {
   unset BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CLI_ARGS_1
   unset BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CLI_ARGS_2
   unset BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CLI_ARGS_3
+}
+
+@test "Writes no compose override when there is nothing to override" {
+  # A service's `build:` key with nothing indented under it is YAML null, and
+  # compose rejects the merged config with "invalid type <nil> for build". With
+  # none of args/labels/cache_from/cache_to/platforms/tags set there is nothing
+  # to put under it, so the plugin writes no override at all and passes no extra
+  # --file — which also leaves a service that does not exist missing, rather than
+  # one the override brings into being. Nothing to upload as an artifact either.
+  unset BUILDKITE_COMMAND
+
+  stub docker \
+    "buildx create --name docker-compose-build-buildkite-plugin-test-job-id --use : true" \
+    "buildx bake --progress=plain --builder docker-compose-build-buildkite-plugin-test-job-id --load web : true"
+
+  run "$PLUGIN_PATH/hooks/command"
+
+  assert_success
+  [[ ! -e "$OVERRIDE_FILE" ]]
 }
 
 @test "Uploads the override file as a Buildkite artifact named docker-compose-build-buildkite-plugin.yml" {
