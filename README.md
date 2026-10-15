@@ -75,6 +75,7 @@ steps:
 | `file` | string or array | bake's own file discovery (`compose.yaml`, `docker-compose.yml`, `docker-bake.hcl`, …) | Compose file(s), passed through as `--file`. Later files override earlier ones. Bake runs from the first file's directory, so relative build contexts resolve against it. |
 | `args` | array | — | Build args as `KEY=VALUE`, set as the service's `build.args`. |
 | `labels` | array | — | Image labels as `KEY=VALUE`, set as the service's `build.labels`. |
+| `buildkite_labels` | boolean | `false` | Add [Buildkite labels](#buildkite-labels) describing the pipeline, build, job and agent to the image. |
 | `tags` | array | — | Image tags, set as the service's `build.tags`. Providing any tag switches the build from `--load` to `--push`. |
 | `platforms` | array | — | Target platforms (e.g. `linux/amd64`), set as the service's `build.platforms`. |
 | `cache_from` | array | — | Cache sources (e.g. `type=registry,ref=…`), set as the service's `build.cache_from`. |
@@ -84,6 +85,23 @@ steps:
 `additionalProperties` is disabled, so an unrecognised or misspelled option fails validation rather than being silently ignored.
 
 Every array option **replaces** the equivalent field in your compose file rather than appending to it — the values you give here are the final list used for the build.
+
+### Buildkite labels
+
+With `buildkite_labels: true` the image gets the same labels the [docker plugin](https://buildkite.com/resources/plugins/buildkite-plugins/docker-buildkite-plugin/) adds to the containers it runs, so you can trace an image back to the job that built it:
+
+| Label | Value |
+|-------|-------|
+| `com.buildkite.pipeline_name` | `$BUILDKITE_PIPELINE_NAME` |
+| `com.buildkite.pipeline_slug` | `$BUILDKITE_PIPELINE_SLUG` |
+| `com.buildkite.build_number` | `$BUILDKITE_BUILD_NUMBER` |
+| `com.buildkite.job_id` | `$BUILDKITE_JOB_ID` |
+| `com.buildkite.job_label` | `$BUILDKITE_LABEL` |
+| `com.buildkite.step_key` | `$BUILDKITE_STEP_KEY` |
+| `com.buildkite.agent_name` | `$BUILDKITE_AGENT_NAME` |
+| `com.buildkite.agent_id` | `$BUILDKITE_AGENT_ID` |
+
+They are combined with `labels`, and a label in `labels` with the same key takes precedence.
 
 This plugin only builds; it does not run the step's command. A step that sets both prints a warning and the command is ignored — run it in a separate step, or use [docker-compose-run](https://github.com/jameslnewell/docker-compose-run-buildkite-plugin).
 

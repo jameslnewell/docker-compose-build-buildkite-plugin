@@ -24,6 +24,7 @@ Options not defined in the Compose spec follow CLI conventions:
 | `service` | `BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_SERVICE` | Service to build, and the bake target |
 | `file` | `BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_FILE` | Compose file(s), matching `docker compose -f` |
 | `cli_args` | `BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CLI_ARGS` | Escape hatch for `docker buildx bake` flags |
+| `buildkite_labels` | `BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_BUILDKITE_LABELS` | Add `com.buildkite.*` labels to the image (opt-in, unlike the docker plugin's `run-labels`) |
 
 Array options are read with `plugin_read_list` in [`lib/shared.bash`](./lib/shared.bash), which reads the `_0`, `_1`, … indexed variables the agent exports for YAML arrays and falls back to the unindexed variable for scalars.
 
