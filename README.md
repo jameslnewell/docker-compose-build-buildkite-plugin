@@ -16,7 +16,7 @@ Build a service and load the image into the agent's Docker daemon:
 ```yaml
 steps:
   - plugins:
-      - jameslnewell/docker-compose-build#v0.3.1:
+      - jameslnewell/docker-compose-build#v0.4.0:
           service: web
 ```
 
@@ -25,7 +25,7 @@ Tag the image to push it to a registry instead:
 ```yaml
 steps:
   - plugins:
-      - jameslnewell/docker-compose-build#v0.3.1:
+      - jameslnewell/docker-compose-build#v0.4.0:
           service: web
           file: docker-compose.yml
           tags:
@@ -45,7 +45,7 @@ Pass build args and labels:
 ```yaml
 steps:
   - plugins:
-      - jameslnewell/docker-compose-build#v0.3.1:
+      - jameslnewell/docker-compose-build#v0.4.0:
           service: api
           args:
             - NODE_ENV=production
@@ -60,7 +60,7 @@ Pass a bake flag the plugin doesn't model as a first-class option — each array
 ```yaml
 steps:
   - plugins:
-      - jameslnewell/docker-compose-build#v0.3.1:
+      - jameslnewell/docker-compose-build#v0.4.0:
           service: web
           cli_args:
             - --provenance
