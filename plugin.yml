@@ -28,6 +28,9 @@ configuration:
     buildkite_labels:
       type: boolean
       description: "Add com.buildkite.* labels describing the pipeline, build, job and agent to the image"
+    opencontainers_labels:
+      type: boolean
+      description: "Add org.opencontainers.image.* labels for the build time, git commit and repository to the image"
     tags:
       type: array
       description: "Image tags. Providing any tag switches the build from --load to --push"
