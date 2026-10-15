@@ -76,6 +76,7 @@ steps:
 | `args` | array | — | Build args as `KEY=VALUE`, set as the service's `build.args`. |
 | `labels` | array | — | Image labels as `KEY=VALUE`, set as the service's `build.labels`. |
 | `buildkite_labels` | boolean | `false` | Add [Buildkite labels](#buildkite-labels) describing the pipeline, build, job and agent to the image. |
+| `opencontainers_labels` | boolean | `false` | Add [OCI labels](#oci-labels) for the build time, git commit and repository to the image. |
 | `tags` | array | — | Image tags, set as the service's `build.tags`. Providing any tag switches the build from `--load` to `--push`. |
 | `platforms` | array | — | Target platforms (e.g. `linux/amd64`), set as the service's `build.platforms`. |
 | `cache_from` | array | — | Cache sources (e.g. `type=registry,ref=…`), set as the service's `build.cache_from`. |
@@ -102,6 +103,20 @@ With `buildkite_labels: true` the image gets the same labels the [docker plugin]
 | `com.buildkite.agent_id` | `$BUILDKITE_AGENT_ID` |
 
 They are combined with `labels`, and a label in `labels` with the same key takes precedence.
+
+### OCI labels
+
+With `opencontainers_labels: true` the image gets the [pre-defined OCI annotation keys](https://github.com/opencontainers/image-spec/blob/main/annotations.md#pre-defined-annotation-keys) that tools such as registries and vulnerability scanners read to link an image back to its source:
+
+| Label | Value |
+|-------|-------|
+| `org.opencontainers.image.created` | The time of the build, in RFC 3339 UTC |
+| `org.opencontainers.image.revision` | `$BUILDKITE_COMMIT` |
+| `org.opencontainers.image.source` | `$BUILDKITE_REPO` |
+
+They are combined with `labels`, and a label in `labels` with the same key takes precedence. For example, set `org.opencontainers.image.source` yourself to publish an HTTPS URL when the pipeline checks out over SSH.
+
+Buildx's own `BUILDX_GIT_LABELS` environment variable adds similar labels, but reads them from the git checkout. That means the revision gets a `-dirty` suffix when an earlier step has left changes in the working tree.
 
 This plugin only builds; it does not run the step's command. A step that sets both prints a warning and the command is ignored — run it in a separate step, or use [docker-compose-run](https://github.com/jameslnewell/docker-compose-run-buildkite-plugin).
 

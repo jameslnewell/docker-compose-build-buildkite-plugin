@@ -52,8 +52,8 @@ fi
 mapfile -t BUILD_ARGS < <(plugin_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_ARGS")
 LABELS=()
 # Same label set the docker plugin applies to the containers it runs, applied
-# here to the image instead. They come before the user's own labels so a user
-# label with the same key wins.
+# here to the image instead. These and the opencontainers labels come before
+# the user's own labels so a user label with the same key wins.
 if [[ "${BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_BUILDKITE_LABELS:-false}" == "true" ]]; then
   LABELS+=(
     "com.buildkite.pipeline_name=${BUILDKITE_PIPELINE_NAME:-}"
@@ -64,6 +64,16 @@ if [[ "${BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_BUILDKITE_LABELS:-false}" == "tru
     "com.buildkite.step_key=${BUILDKITE_STEP_KEY:-}"
     "com.buildkite.agent_name=${BUILDKITE_AGENT_NAME:-}"
     "com.buildkite.agent_id=${BUILDKITE_AGENT_ID:-}"
+  )
+fi
+# Standard OCI annotation keys, filled from Buildkite's variables rather than
+# buildx's BUILDX_GIT_LABELS so they don't depend on the checkout's remote or
+# get a -dirty suffix from files earlier steps left in the working tree.
+if [[ "${BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_OPENCONTAINERS_LABELS:-false}" == "true" ]]; then
+  LABELS+=(
+    "org.opencontainers.image.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    "org.opencontainers.image.revision=${BUILDKITE_COMMIT:-}"
+    "org.opencontainers.image.source=${BUILDKITE_REPO:-}"
   )
 fi
 mapfile -t -O "${#LABELS[@]}" LABELS < <(plugin_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_LABELS")

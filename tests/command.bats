@@ -301,3 +301,42 @@ teardown() {
   assert_success
   [[ ! -e "$OVERRIDE_FILE" ]]
 }
+
+@test "Adds OCI labels before user labels when opencontainers_labels is true" {
+  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_OPENCONTAINERS_LABELS="true"
+  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_LABELS_0="org.opencontainers.image.source=https://github.com/example/repo"
+  export BUILDKITE_COMMIT="abc123"
+  export BUILDKITE_REPO="git@github.com:example/repo.git"
+
+  CAPTURE_FILE="${BATS_TEST_TMPDIR}/captured-override.yml"
+  stub docker \
+    "buildx create --name docker-compose-build-buildkite-plugin-test-job-id --use : true" \
+    "buildx bake --progress=plain --builder docker-compose-build-buildkite-plugin-test-job-id --file ${OVERRIDE_FILE} --load web : cp ${OVERRIDE_FILE} ${CAPTURE_FILE}"
+  stub buildkite-agent "artifact upload docker-compose-build-buildkite-plugin.yml : true"
+
+  run "$PLUGIN_PATH/hooks/command"
+
+  assert_success
+  run cat "$CAPTURE_FILE"
+  assert_line --index 4 --regexp "^        - 'org\.opencontainers\.image\.created=[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z'$"
+  assert_line --index 5 "        - 'org.opencontainers.image.revision=abc123'"
+  assert_line --index 6 "        - 'org.opencontainers.image.source=git@github.com:example/repo.git'"
+  # A user label must come after the OCI ones so it wins on a duplicate key.
+  assert_line --index 7 "        - 'org.opencontainers.image.source=https://github.com/example/repo'"
+
+  unset BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_OPENCONTAINERS_LABELS
+  unset BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_LABELS_0
+}
+
+@test "Adds no OCI labels by default" {
+  export BUILDKITE_COMMIT="abc123"
+
+  stub docker \
+    "buildx create --name docker-compose-build-buildkite-plugin-test-job-id --use : true" \
+    "buildx bake --progress=plain --builder docker-compose-build-buildkite-plugin-test-job-id --load web : true"
+
+  run "$PLUGIN_PATH/hooks/command"
+
+  assert_success
+  [[ ! -e "$OVERRIDE_FILE" ]]
+}
