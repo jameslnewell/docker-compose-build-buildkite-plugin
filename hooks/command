@@ -86,8 +86,9 @@ mapfile -t TAGS < <(plugin_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_TAGS
 # platforms/tags as full arrays. Older buildx versions (< 0.13) don't support
 # the `--set name.field+=value` array-append syntax, so building the arrays in
 # the compose layer is the portable way to pass them. The override is the
-# last `--file` so it merges last; compose replaces arrays with the override's
-# values, matching the intent of these options as "the final list to use".
+# last `--file` so it merges last. Bake merges rather than replaces: args and
+# labels merge by key (the override wins on a duplicate key), and the other
+# lists are appended to the compose file's.
 #
 # The file lives in its own per-job dir (BUILDKITE_JOB_ID is unique) so the
 # upload below can address it by bare filename — keeping the artifact in the
