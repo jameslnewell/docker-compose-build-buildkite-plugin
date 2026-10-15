@@ -50,7 +50,23 @@ else
 fi
 
 mapfile -t BUILD_ARGS < <(plugin_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_ARGS")
-mapfile -t LABELS < <(plugin_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_LABELS")
+LABELS=()
+# Same label set the docker plugin applies to the containers it runs, applied
+# here to the image instead. They come before the user's own labels so a user
+# label with the same key wins.
+if [[ "${BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_BUILDKITE_LABELS:-false}" == "true" ]]; then
+  LABELS+=(
+    "com.buildkite.pipeline_name=${BUILDKITE_PIPELINE_NAME:-}"
+    "com.buildkite.pipeline_slug=${BUILDKITE_PIPELINE_SLUG:-}"
+    "com.buildkite.build_number=${BUILDKITE_BUILD_NUMBER:-}"
+    "com.buildkite.job_id=${BUILDKITE_JOB_ID:-}"
+    "com.buildkite.job_label=${BUILDKITE_LABEL:-}"
+    "com.buildkite.step_key=${BUILDKITE_STEP_KEY:-}"
+    "com.buildkite.agent_name=${BUILDKITE_AGENT_NAME:-}"
+    "com.buildkite.agent_id=${BUILDKITE_AGENT_ID:-}"
+  )
+fi
+mapfile -t -O "${#LABELS[@]}" LABELS < <(plugin_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_LABELS")
 mapfile -t CACHE_FROM < <(plugin_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CACHE_FROM")
 mapfile -t CACHE_TO < <(plugin_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_CACHE_TO")
 mapfile -t PLATFORMS < <(plugin_read_list "BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_PLATFORMS")

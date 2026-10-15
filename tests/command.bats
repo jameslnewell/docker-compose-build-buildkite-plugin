@@ -251,3 +251,53 @@ teardown() {
   unset BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_TAGS_0
   unset BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_TAGS_1
 }
+
+@test "Adds Buildkite labels before user labels when buildkite_labels is true" {
+  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_BUILDKITE_LABELS="true"
+  export BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_LABELS_0="com.buildkite.job_label=overridden"
+  export BUILDKITE_PIPELINE_NAME="My Pipeline"
+  export BUILDKITE_PIPELINE_SLUG="my-pipeline"
+  export BUILDKITE_BUILD_NUMBER="42"
+  export BUILDKITE_LABEL=":docker: Build"
+  export BUILDKITE_STEP_KEY="build"
+  export BUILDKITE_AGENT_NAME="agent-1"
+  export BUILDKITE_AGENT_ID="agent-id"
+
+  CAPTURE_FILE="${BATS_TEST_TMPDIR}/captured-override.yml"
+  stub docker \
+    "buildx create --name docker-compose-build-buildkite-plugin-test-job-id --use : true" \
+    "buildx bake --progress=plain --builder docker-compose-build-buildkite-plugin-test-job-id --file ${OVERRIDE_FILE} --load web : cp ${OVERRIDE_FILE} ${CAPTURE_FILE}"
+  stub buildkite-agent "artifact upload docker-compose-build-buildkite-plugin.yml : true"
+
+  run "$PLUGIN_PATH/hooks/command"
+
+  assert_success
+  run cat "$CAPTURE_FILE"
+  # A user label must come after the Buildkite ones so it wins on a duplicate key.
+  assert_output --partial "      labels:
+        - 'com.buildkite.pipeline_name=My Pipeline'
+        - 'com.buildkite.pipeline_slug=my-pipeline'
+        - 'com.buildkite.build_number=42'
+        - 'com.buildkite.job_id=test-job-id'
+        - 'com.buildkite.job_label=:docker: Build'
+        - 'com.buildkite.step_key=build'
+        - 'com.buildkite.agent_name=agent-1'
+        - 'com.buildkite.agent_id=agent-id'
+        - 'com.buildkite.job_label=overridden'"
+
+  unset BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_BUILDKITE_LABELS
+  unset BUILDKITE_PLUGIN_DOCKER_COMPOSE_BUILD_LABELS_0
+}
+
+@test "Adds no Buildkite labels by default" {
+  export BUILDKITE_PIPELINE_SLUG="my-pipeline"
+
+  stub docker \
+    "buildx create --name docker-compose-build-buildkite-plugin-test-job-id --use : true" \
+    "buildx bake --progress=plain --builder docker-compose-build-buildkite-plugin-test-job-id --load web : true"
+
+  run "$PLUGIN_PATH/hooks/command"
+
+  assert_success
+  [[ ! -e "$OVERRIDE_FILE" ]]
+}
