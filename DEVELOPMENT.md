@@ -31,7 +31,7 @@ Array options are read with `plugin_read_list` in [`lib/shared.bash`](./lib/shar
 
 ### Why a generated compose override instead of `--set`
 
-The array options could be passed as `docker buildx bake --set <service>.tags+=<value>`, but the array-append `+=` syntax needs buildx 0.13 or newer. Rendering the values into a compose override file — passed as the last `--file` so it merges last — carries the full arrays portably across older buildx versions. Because compose replaces (rather than appends to) arrays from a later file, these options are documented as "the final list to use".
+The array options could be passed as `docker buildx bake --set <service>.tags+=<value>`, but the array-append `+=` syntax needs buildx 0.13 or newer. Rendering the values into a compose override file — passed as the last `--file` so it merges last — carries the full arrays portably across older buildx versions. Bake merges the override into the earlier files rather than replacing them. `args` and `labels` merge by key, with the later file winning on a duplicate key, and the other lists are appended. The README documents this, so the options can't promise to be the final list used for the build.
 
 The override is written to a per-job directory (`$TMPDIR/docker-compose-build-buildkite-plugin-<job id>`) and uploaded from there by bare filename, so the artifact appears in the Buildkite UI as `docker-compose-build-buildkite-plugin.yml` rather than a per-job tmp path. The name also avoids `docker-compose.override.yml`, which compose would auto-load.
 
